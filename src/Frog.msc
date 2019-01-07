@@ -1,0 +1,33 @@
+options: -s
+path="C:/CDIGAME"
+
+define
+	album		"FROG FEAST"
+	publisher	"RASTER SOFTWARE"
+	preparer	"CHARLES DOTY"
+
+	volume	"FROG FEAST"	in	"C:/CDIGAME/FROG.CD"
+
+	copyright	file	Copyright	from "C:/CDIGAME/DISK/COPYRGHT.TXT"
+	abstract	file	Abstract	from "C:/CDIGAME/DISK/ABSTRACT.TXT"
+	biblio		file	Biblio		from "C:/CDIGAME/DISK/BIBLIOGR.TXT"
+	message							from "C:/CDIGAME/DISK/NUL_FILE"
+
+	application file	cdi_frog	from "C:/CDIGAME/DISK/CDI_FROG"
+
+	yellow		file	PlaneA		rounded from "C:/CDIGAME/DISK/PLANEA.BIN"
+	yellow		file	PlaneB		rounded from "C:/CDIGAME/DISK/PLANEB.BIN"
+	yellow		file	Palettes	rounded from "C:/CDIGAME/DISK/PALETTES.BIN"
+	yellow		file	Sounds		rounded from "C:/CDIGAME/DISK/SOUNDS.BIN"
+
+{
+	"COPYRGHT.TXT"	owner 0.0 protection 0x111	from	Copyright
+	"ABSTRACT.TXT"	owner 0.0 protection 0x111	from	Abstract
+	"BIBLIOGR.TXT"	owner 0.0 protection 0x111	from	Biblio
+	"CDI_FROG"		owner 0.0 protection 0x555	from	cdi_frog
+	"PLANEA.BIN"	owner 0.0 protection 0x111	from	PlaneA
+	"PLANEB.BIN"	owner 0.0 protection 0x111	from	PlaneB
+	"PALETTES.BIN"	owner 0.0 protection 0x111	from	Palettes
+	"SOUNDS.BIN"	owner 0.0 protection 0x111	from	Sounds
+}
+

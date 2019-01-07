@@ -1,0 +1,166 @@
+* CD-I Frog Feast (c) RasterSoft
+
+	use	<oskdefs.d>
+
+	use	"Defines\Defines.d"
+
+	psect	Screens,0,0,0,0,0
+
+* Preload data.
+* In the original Frog Feast the data is preloaded in two steps,
+* as the first two screen are shown.
+PreloadData:
+	movem.l	d2-d5/a0-a3,-(sp)
+
+* Allocate memory for the palettes
+	move.l	#PALETTE_FILESIZE,d0
+	os9		F$SRqMem
+	bcs		ErrorExit
+
+* Store pointer
+	move.l	a2,PalettePointer(a6)
+
+* Open PALETTES.BIN file and read into PalettePointer.
+	move.l	a2,a1
+	move.l	#PALETTE_FILESIZE,d2
+	lea		PaletteFilename(pc),a0
+	bsr		ReadFile
+	bcs		ErrorExit
+
+* Load Plane B palette into Plane B. Plane B palette is the second in the file (Offset PALETTE_SIZE)
+	move.l	PalettePointer(a6),a0
+	add.l	#PALETTE_SIZE,a0
+	bsr		LoadPaletteB
+
+* Allocate temp memory for Plane B data
+	move.l	#PLANEB_FILESIZE,d0
+	os9		F$SRqMem
+	bcs		ErrorExit
+
+* Store pointer
+	move.l	a2,TempData(a6)
+
+* Preload Plane B data into Plane B
+	move.l	a2,a1
+	move.l	#PLANEB_FILESIZE,d2
+	lea		PlaneBFilename(pc),a0
+	bsr		ReadFile
+	bcs		ErrorExit
+
+* Allocate memory for Plane A data
+	move.l	#PLANEA_FILESIZE,d0
+	os9		F$SRqMem
+	bcs		ErrorExit
+
+* Store pointer
+	move.l	a2,PlaneAData(a6)
+
+* Preload sprites into Plane A
+	move.l	a2,a1
+	move.l	#PLANEA_FILESIZE,d2
+	lea		PlaneAFilename(pc),a0
+	bsr		ReadFile
+	bcs		ErrorExit
+
+* Transfer title
+	move.l	TempData(a6),a0
+	move.l	PlaneBufferB(a6),a1
+	add.l	ScreenOffset(a6),a1
+	bsr		TransferImage
+
+* Transfer background
+	move.l	TempData(a6),a0
+	add.l	#(SCREENWIDTH*IMAGEHEIGHT),a0
+	move.l	PlaneBufferB(a6),a1
+	add.l	ScreenOffset(a6),a1
+	add.l	#(SCREENWIDTH*SCREENHEIGHT),a1
+	bsr		TransferImage
+
+* Delete temp memory pointer
+	move.l	TempData(a6),a2
+	move.l	#PLANEB_FILESIZE,d0
+	os9		F$SRtMem
+
+	movem.l	(sp)+,d2-d5/a0-a3
+
+	rts
+
+* Display the title by switching to the title background in Plane B
+DisplayTitle:
+	movem.l	d2-d5/a0-a3,-(sp)
+
+* Wait VBlank
+	bsr		WaitVBlankNoUpdate
+
+* Display title image in Plane B
+	move.w	#0,d0
+	bsr		FlipPlaneB
+
+* Clear plane A
+	move.l	PlaneBufferA(a6),a0
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2/32-1,d0
+	bsr		ClearPlane
+
+* Load Plane A palette into Plane A. Plane A palette is the third in the file (Offset PALETTE_SIZE * 2)
+	move.l	PalettePointer(a6),a0
+	add.l	#PALETTE_SIZE*2,a0
+	bsr		LoadPaletteA
+
+	movem.l	(sp)+,d2-d5/a0-a3
+
+	rts
+
+* Hide the title by switching to the game background in Plane B
+DisplayBackground:
+	movem.l	a0,-(sp)
+	
+* Wait VBlank
+	bsr		WaitVBlankNoUpdate
+
+	move.w	#1,d0
+	bsr		FlipPlaneB
+
+* Clear Plane A to remove sprites and text
+	move.l	PlaneBufferA(a6),a0
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2/32-1,d0
+	bsr		ClearPlane
+
+	movem.l	(sp)+,a0
+
+	rts
+
+* Clear the text plane (Plane A)
+ClearTextPlane:
+	movem.l	d2-d5/a0-a3,-(sp)
+
+* Wait VBlank
+	bsr		WaitVBlankNoUpdate
+
+* Clear Plane A to remove sprites and text
+	move.l	PlaneBufferA(a6),a0
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2/32-1,d0
+	bsr		ClearPlane
+
+	movem.l	(sp)+,d2-d5/a0-a3
+
+	rts
+
+* Delete the memory used by the screens.
+CloseScreens:
+	movem.l	d2-d7/a0-a5,-(sp)
+
+* Free Palette memory	
+	move.l	#PALETTE_FILESIZE,d0
+	move.l	PalettePointer(a6),a2
+	os9		F$SRtMem	
+	
+* Free PlaneA data memory	
+	move.l	#PLANEA_FILESIZE,d0
+	move.l	PlaneAData(a6),a2
+	os9		F$SRtMem	
+	
+	movem.l	(sp)+,d2-d7/a0-a5
+
+	rts
+
+	ends

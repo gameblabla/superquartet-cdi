@@ -1,0 +1,112 @@
+* The code in this file is based on code written
+* by CD-i Fan. See the enclosed README.SRC file
+* for a description of the modifications.
+
+	use		<oskdefs.d>
+	use		"Defines\csdtype.d"
+	use		"Defines\viddcp.d"
+	use		"Defines\dcpins.d"
+
+	psect	cursor,0,0,0,0,0
+
+** Initializes cursor.
+*
+* @return cc Carry set on error.
+* @return d1.w Error code.
+*
+* @note Calling this routine (or equivalent) is mandatory for
+* every CD-i application that uses the video device in any way,
+* because otherwise some cursor parameters may
+* not be in a defined state.
+
+InitCursor:
+	movem.l	d2-d7/a0-a5,-(sp)
+
+* Hide cursor.
+		bsr.s		csrhide
+		bcs.s		csrret
+
+* Set cursor color to white.
+		move.l	#$FFFFFFFF,d3
+		bsr.s		csrcol
+		bcs.s		csrret
+
+* Set cursor pattern to an arrow.
+		moveq		#0,d3
+		move.l	#(16<<8)!16,d4
+		moveq		#0,d5
+		lea		csrarrow(pc),a0
+		bsr.s		csrptn
+		bcs.s		csrret
+
+* Set cursor blink rate.
+		moveq		#$70,d3
+		bsr.s		csrblnk
+		bcs.s		csrret
+
+* Set cursor coordinate origin.
+		moveq		#0,d3
+		bsr.s		csrorg
+		bcs.s		csrret
+
+* Clear error code.
+		clr.w		d1
+
+csrret
+	movem.l	(sp)+,d2-d7/a0-a5
+	
+		rts
+
+CloseCursor:
+	movem.l	d2-d7/a0-a5,-(sp)
+
+	bsr.s	csrshow
+
+	movem.l	(sp)+,d2-d7/a0-a5
+	
+	rts
+
+** Hides cursor.
+csrhide:
+		moveq		#GC_Hide,d2
+		bra.s		csrsetgc
+
+** Shows cursor.
+csrshow:
+		moveq		#GC_Show,d2
+		bra.s		csrsetgc
+
+** Sets cursor color.
+csrcol:
+		moveq		#GC_Col,d2
+		bra.s		csrsetgc
+
+** Sets cursor pattern.
+csrptn:
+		moveq		#GC_Ptn,d2
+		bra.s		csrsetgc
+
+** Sets cursor blink rate.
+csrblnk:
+		moveq		#GC_Blnk,d2
+		bra.s		csrsetgc
+
+** Sets cursor coordinate origin.
+csrorg:
+		moveq		#GC_Org,d2
+		bra.s		csrsetgc
+
+csrpos:
+		moveq		#GC_Pos,d2
+
+** Performs I$SetStt SS_GC cursor operation.
+csrsetgc:
+		moveq		#SS_GC,d1
+		bra		SetStat
+
+** Pattern for arrow cursor.
+csrarrow:
+		dc.w		$C000,$E000,$F000,$F800,$FC00,$FE00,$FF00,$F800
+		dc.w		$D800,$8C00,$0C00,$0600,$0600,$0300,$0300,$0000
+
+		ends

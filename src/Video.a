@@ -1,0 +1,588 @@
+* CD-I Frog Feast (c) RasterSoft
+*
+* Most of the InitVideo and support code in this file
+* is based on code by CD-i Fan. The code is a mix of
+* two source files he released.
+*
+* All the rest of the code was written by CDoty.
+
+	use	<oskdefs.d>
+
+	use	"Defines\csdtype.d"
+	use	"Defines\Defines.d"
+	use	"Defines\dcpins.d"
+	use	"Defines\viddcp.d"
+
+	psect	Video,0,0,0,0,0
+
+InitVideo:
+	movem.l	d2-d7/a0-a2,-(sp)
+
+* Find name and parameters of video device.
+	moveq	#DT_VIDEO,d0
+	bsr		csdfind
+
+* Open device.
+	moveq	#Read_+Write_,d0
+	os9		I$Open
+	bcs		ErrorExit
+
+* Save path to device.
+	move.w	d0,VideoPath(a6)
+
+* Assume native PAL format.
+	move.w	#625,d2
+	moveq	#0,d3
+	moveq	#0,d4
+
+* Get "LI" parameter number.
+	lea		LIText(pc),a0
+	bsr		csdnumber
+	bcs		ErrorExit
+	beq.s	LIValueNotRead
+
+* Save number of lines.
+	move.w	d0,d2
+
+LIValueNotRead:
+* If PAL, we're done.
+	cmp.w	#625,d2
+	beq.s	PalDisplayMode
+
+* Store X Offset as the screen offset
+	move.l	#0,ScreenOffset(a6)
+
+* Set vertical offset
+	moveq	#40,d4
+
+* Check for "TV" parameter.
+	lea		TVText(pc),a0
+	bsr		csdparam
+	bcc.s	PalDisplayMode
+
+* Use compatibility mode for NTSC monitor.
+	moveq	#1,d3
+
+PalDisplayMode:
+* Set compatibility flag.
+	bsr		SetCompatibility
+	bcs		ErrorExit
+
+* Save coordinate offset.
+	move.l	d4,VideoOffset(a6)
+
+* Set non-interlace mode.
+	moveq	#0,d3
+	bsr		SetInterlace
+	bcs		ErrorExit
+
+* Link to video interrupt event.
+	lea		EventText(pc),a0
+	moveq	#Ev$Link,d1
+	os9		F$Event
+	bcs		ErrorExit
+
+* Save event id.
+	move.l	d0,InterruptEvent(a6)
+
+* Create two normal-resolution FCTs.
+	move.w	#FCTLEN,d4
+	moveq	#0,d5
+
+	moveq	#PA,d3
+	bsr		CreateFCT
+	bcs		InitVideoExit
+	move.w	d0,FCTHandleA(a6)
+
+	moveq	#PB,d3
+	bsr		CreateFCT
+	bcs		InitVideoExit
+	move.w	d0,FCTHandleB(a6)
+
+* Create two normal-resolution LCTs.
+	move.w	#LCTLEN,d4
+	moveq	#0,d5
+
+	moveq	#PA,d3
+	bsr		CreateLCT
+	bcs		InitVideoExit
+	move.w	d0,LCTHandleA(a6)
+
+	moveq	#PB,d3
+	bsr		CreateLCT
+	bcs		ErrorExit
+	move.w	d0,LCTHandleB(a6)
+
+* Fill LCTs with NOP instructions.
+	moveq	#0,d4
+	moveq	#0,d5
+	move.w	#LCTLEN,d6
+	moveq	#8,d7
+
+	bsr		WriteNOPA
+	bsr		WriteNOPB
+
+* Link FCTs to LCTs.
+	move.w	FCTHandleA(a6),d3
+	move.w	LCTHandleA(a6),d4
+	bsr		FCTLink
+	bcs		ErrorExit
+
+	move.w	FCTHandleB(a6),d3
+	move.w	LCTHandleB(a6),d4
+	bsr		FCTLink
+	bcs		ErrorExit
+
+* Transfer Plane A FCT
+	moveq	#0,d4
+	move.l	#InitialFCTASize,d5
+	lea		InitialFCTA(pc),a0
+	bsr		WriteFCTBlockA
+	bcs		InitVideoExit
+
+* Transfer Plane B FCT
+	move.l	#InitialFCTBSize,d5
+	lea		InitialFCTB(pc),a0
+	bsr		WriteFCTBlockB
+	bcs		InitVideoExit
+
+* Allocate memory for Plane A (double buffered)
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2,d0
+	move.l	#VIDEO1,d1
+	os9		F$SRqCMem
+	bcs		ErrorExit
+
+* Store pointer
+	move.l	a2,PlaneBufferA(a6)
+
+* Allocate memory for Plane B (double buffered)
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2,d0
+	move.l	#VIDEO2,d1
+	os9		F$SRqCMem
+	bcs		ErrorExit
+
+* Store pointer
+	move.l	a2,PlaneBufferB(a6)
+
+* Set video start addresses.
+	move.w	#FCT_VSR,d4
+
+	move.l	PlaneBufferA(a6),d5
+	and.l	#VSR_MASK,d5
+	ori.l	#CP_VSR,d5
+	bsr		WriteFCTA
+
+	move.l	PlaneBufferB(a6),d5
+	and.l	#VSR_MASK,d5
+	ori.l	#CP_VSR,d5
+	bsr		WriteFCTB
+
+* Write interrupt to Plane A FCT
+	move.w	#FCT_INT,d4
+	move.l	#CP_INT,d5
+	bsr		WriteFCTA
+
+* Clear plane A
+	move.l	PlaneBufferA(a6),a0
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2/32-1,d0
+	bsr		ClearPlane
+
+* Clear plane B
+	move.l	PlaneBufferB(a6),a0
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2/32-1,d0
+	bsr		ClearPlane
+
+* Execute the FCTs.
+	move.w	FCTHandleA(a6),d3
+	move.w	FCTHandleB(a6),d4
+	bsr		ExecuteFCT
+
+*	bra.s	InitVideoExit
+
+ErrorExit:
+*	lea		VideoErrorMessage(pc),a0
+*	move.l	a0,d0
+*	bsr		printf
+
+InitVideoExit:
+	movem.l	(sp)+,d2-d7/a0-a2
+
+	rts
+
+CloseVideo:
+	movem.l	d2-d7/a0-a5,-(sp)
+
+* Remove link to video interrupt event.
+	move.l	InterruptEvent(a6),d0
+	os9		Ev$UnLnk
+
+* Execute default FCTs.
+	move.w	#0,d3
+	move.w	#0,d4
+	bsr		ExecuteFCT
+
+* Delete LCTs
+	move.w	LCTHandleA(a6),d3
+	bsr		DeleteLCT
+
+	move.w	LCTHandleB(a6),d3
+	bsr		DeleteLCT
+
+* Delete FCTs
+	move.w	FCTHandleA(a6),d3
+	bsr		DeleteFCT
+
+	move.w	FCTHandleB(a6),d3
+	bsr		DeleteFCT
+
+* Free PlaneA memory
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2,d0
+	move.l	PlaneBufferA(a6),a2
+	os9		F$SRtMem
+
+* Free PlaneB memory
+	move.l	#SCREENWIDTH*SCREENHEIGHT*2,d0
+	move.l	PlaneBufferB(a6),a2
+	os9		F$SRtMem
+
+* Close video path
+	move.w	VideoPath(a6),d0
+	os9		I$Close
+
+	movem.l	(sp)+,d2-d7/a0-a5
+
+	rts
+
+* Wait for video interrupt.
+WaitVBlankNoUpdate:
+	movem.l	d1-d3,-(sp)
+
+	move.l	InterruptEvent(a6),d0
+	moveq	#Ev$Wait,d1
+	moveq	#1,d2
+	moveq	#1,d3
+	os9		F$Event
+
+	movem.l	(sp)+,d1-d3
+
+	rts
+
+* Wait for video interrupt. (Doesn't preserve registers)
+WaitVBlankInternal:
+	move.l	InterruptEvent(a6),d0
+	moveq	#Ev$Wait,d1
+	moveq	#1,d2
+	moveq	#1,d3
+	os9		F$Event
+
+	rts
+
+* Set compatibility mode.
+SetCompatibility:
+	moveq	#DC_SetCmp,d2
+	bra.s	SetDC
+
+* Set interlace mode.
+SetInterlace:
+	moveq	#DC_Intl,d2
+	bra.s	SetDC
+
+* Create FCT
+CreateFCT:
+	moveq	#DC_CrFCT,d2
+	bra.s	SetDC
+
+* Delete FCT.
+DeleteFCT:
+	moveq	#DC_DlFCT,d2
+	bra.s	SetDC
+
+* Write FCT instruction for plane A.
+WriteFCTA:
+	move.w	FCTHandleA(a6),d3
+	bra.s	WriteFCT
+
+* Write FCT instruction for plane B.
+WriteFCTB:
+	move.w	FCTHandleB(a6),d3
+
+* Write FCT instruction.
+WriteFCT:
+	moveq	#DC_WrFI,d2
+	bra.s	SetDC
+
+* Read FCT instruction for plane A.
+ReadFCTA:
+	move.w	FCTHandleA(a6),d3
+	bra.s	ReadFCT
+
+* Read FCT instruction for plane B.
+ReadFCTB:
+	move.w	FCTHandleB(a6),d3
+
+* Read FCT instruction.
+ReadFCT:
+	moveq	#DC_RdFI,d2
+
+	bra.s	SetDC
+
+* WritesFCT instructions for plane A.
+WriteFCTBlockA:
+	move.w	FCTHandleA(a6),d3
+	bra.s	WriteFCTBlock
+
+* Write FCT instructions for plane B.
+WriteFCTBlockB:
+	move.w	FCTHandleB(a6),d3
+
+* Write FCT block instructions.
+WriteFCTBlock:
+	moveq	#DC_WrFCT,d2
+	bra.s	SetDC
+
+* Execute FCTs.
+ExecuteFCT:
+	moveq	#DC_Exec,d2
+	bra.s	SetDC
+
+* Link FCT to LCT.
+FCTLink:
+	moveq	#DC_FLnk,d2
+	bra.s	SetDC
+
+* Create LCT.
+CreateLCT:
+	moveq	#DC_CrLCT,d2
+	bra.s	SetDC
+
+* Create LCT.
+DeleteLCT:
+	moveq	#DC_DlLCT,d2
+	bra.s	SetDC
+
+* Write NOP instructions to LCT for plane A.
+WriteNOPA:
+	move.w	LCTHandleA(a6),d3
+	bra.s	WriteNOP
+
+* Write NOP instructions to LCT for plane B.
+WriteNOPB:
+	move.w	LCTHandleB(a6),d3
+
+* Write NOP instructions to LCT.
+WriteNOP:
+	moveq	#DC_NOP,d2
+	bra.s	SetDC
+
+* Write LCT instruction for plane A.
+WriteLCTA:
+	move.w	LCTHandleA(a6),d3
+	bra.s	WriteLCT
+
+* Write LCT instruction for plane B.
+WriteLCTB:
+	move.w	LCTHandleB(a6),d3
+
+* Write LCT instruction.
+WriteLCT:
+	moveq	#DC_WrLI,d2
+
+* Perform I$SetStt SS_DC video operation.
+SetDC:
+	moveq	#SS_DC,d1
+
+* Perform I$SetStt video operation.
+SetStat:
+	move.w	VideoPath(a6),d0
+	os9		I$SetStt
+	bcs.s	VideoError
+
+	rts
+
+VideoError:
+*	moveq	#0,d0
+*	os9		F$PErr
+
+	ori.w	#1,ccr
+
+	rts
+
+LIText:
+	dc.b	"LI",0
+
+TVText:
+	dc.b	"TV",0
+
+*VideoErrorMessage:
+*	dc.b	"Video Error",$0D,$0A,0
+
+* Palette filename
+PaletteFilename:
+	dc.b	"PALETTES.BIN",0
+
+* Plane A filename
+PlaneAFilename:
+	dc.b	"PLANEA.BIN",0
+
+* Plane B filename
+PlaneBFilename:
+	dc.b	"PLANEB.BIN",0
+
+* Sound filename
+SoundFilename:
+	dc.b	"SOUNDS.BIN",0
+
+* Name of video interrupt event.
+EventText:
+	dc.b	"line_event",0
+
+Starting:
+	dc.b	"Starting",$0D,$0A,0
+
+	align
+
+* Initial FCT instructions for plane A
+InitialFCTA:
+* Set background color to black
+	dc.l	CP_BCOL
+
+* Set Plane A in front of Plane B
+	dc.l	CP_PO+PO_AB
+
+* Set both planes to use CLUT7 mode
+	dc.l	CP_ICM+(CM_CLUT7<<8)+CM_CLUT7
+
+* Reload Display Parameters.
+	dc.l	CP_DPRM
+
+* Set transparency based on Color Key
+	dc.l	CP_TCTL+$800101
+
+* Set transparency Color Key to black
+	dc.l	CP_TCOL_A
+
+* Set Mask Color Key to black
+	dc.l	CP_MCOL_A
+
+* Set mosiac off and to a size of 1
+	dc.l	CP_PHLD_A+PHLD_NORM
+
+* Set pixel weight factor
+	dc.l	CP_WFAC_A+WFAC_MAX
+
+* Set Delta YUV Start Value
+	dc.l	CP_YUV_A+(16<<16)+(128<<8)+(128<<0)
+
+* Region control
+	dc.l	CP_RCTL+(0<<24)+2
+	dc.l	CP_RCTL+(1<<24)+2
+	dc.l	CP_RCTL+(2<<24)+2
+	dc.l	CP_RCTL+(3<<24)+2
+	dc.l	CP_RCTL+(4<<24)+2
+	dc.l	CP_RCTL+(5<<24)+2
+	dc.l	CP_RCTL+(6<<24)+2
+	dc.l	CP_RCTL+(7<<24)+2
+
+InitialFCTASize	equ	(*-InitialFCTA)/4
+
+	align
+
+* Initial FCT instructions for plane B
+InitialFCTB:
+	dc.l	CP_NOP
+	dc.l	CP_NOP
+	dc.l	CP_NOP
+
+* Reload Display Parameters.
+	dc.l	CP_DPRM
+
+* CP_TCTL not used in Plane B.
+	dc.l	CP_NOP
+
+* Set transparency Color Key to black
+	dc.l	CP_TCOL_B
+
+* Set Mask Color Key to black
+	dc.l	CP_MCOL_B
+
+* Set mosiac off and to a size of 1
+	dc.l	CP_PHLD_B+PHLD_NORM
+
+* Set pixel weight factor.
+	dc.l	CP_WFAC_B+WFAC_MAX
+
+* Set Delta YUV Start Value
+	dc.l	CP_YUV_B+(16<<16)+(128<<8)+(128<<0)
+
+InitialFCTBSize	equ	(*-InitialFCTB)/4
+
+* Memory locations
+	vsect
+
+* Interrupt event id.
+InterruptEvent:
+	dc.l	-1
+
+* Video offset.
+VideoOffset:
+	dc.l	0
+
+* LCT handle for plane A.
+FCTHandleA:
+	dc.w	-1
+
+* LCT handle for plane B.
+FCTHandleB:
+	dc.w	-1
+
+* LCT handle for plane A.
+LCTHandleA:
+	dc.w	-1
+
+* LCT handle for plane B.
+LCTHandleB:
+	dc.w	-1
+
+* Offset to center the screen
+ScreenOffset:
+	dc.l	SCREENWIDTH*((SCREENHEIGHT-IMAGEHEIGHT)/2)
+
+* Memory pointer for plane A.
+PlaneBufferA:
+	dc.l	0
+
+* Memory pointer for plane B.
+PlaneBufferB:
+	dc.l	0
+
+* Memory pointer for palette data
+PalettePointer:
+	dc.l	0
+
+* Memory pointer for Plane A data
+PlaneAData:
+	dc.l	0
+
+* Memory pointer for Sound data
+SoundData:
+	dc.l	0
+
+* Temporary memory pointer
+TempData:
+	dc.l	-1
+
+* Pointer to start of Frame
+FrameAddress:
+	dc.l	0
+
+* Current frame for drawing
+Frame:
+	dc.w	0
+
+* Path to video device.
+VideoPath:
+	dc.w	-1
+
+	ends
+
+	ends

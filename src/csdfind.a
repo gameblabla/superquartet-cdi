@@ -1,0 +1,224 @@
+** @name csdfind.s Finds device name and parameters in CSD.
+*
+* @section Copyright (c) 2005, CD-i Fan.
+* This file is licensed under the GNU Library General Public License,
+* version 2 or (at your option) any later version. The full terms of
+* the license can be found in the file LCOPYING that you should have
+* received with this file. You can also refer to the on-line version that
+* can be found at http://www.fsf.org/licensing/licenses/lgpl.txt.
+*
+* @author CD-i Fan
+*
+* @version 0.5.2
+*
+* @history
+* @rev 2005/03/20 cdifan Created
+
+		use		<oskdefs.d>
+
+		psect		csdfind,0,0,0,0,0
+
+CSDLINE	equ	80
+
+** Finds device name and parameters in CSD.
+*
+* @param d0.l Device type number in low word, device index in high word.
+* @return a0 Device name string.
+* @return a1 Device parameters string.
+
+csdfind:
+		move.l	d0,-(sp)
+
+* Open CSD file.
+		moveq		#Read_,d0
+		lea		csdname(pc),a0
+		os9		I$Open
+		bcs.s		csd8
+
+* Clear current index.
+		moveq		#0,d2
+				
+csd1
+* Read CSD line.
+		lea		csdline(a6),a0
+		moveq		#CSDLINE,d1
+		os9		I$ReadLn
+		bcs.s		csd7
+
+* Terminate line just in case.
+		move.b	#13,(a0,d1.w)
+			
+* Parse device type number.
+		move.l	a0,a2	
+		moveq		#0,d1
+		move.w	d1,d2
+
+csd2
+* Process digit of device type.
+		move.b	(a2)+,d2
+		cmp.b		#':',d2
+		beq.s		csd3
+		sub.b		#'0',d2
+		bmi.s		csd1
+		cmp.b		#10,d2
+		bge.s		csd1
+		mulu		#10,d1
+		add.w		d2,d1
+		bra.s		csd2
+
+csd3
+* Is this the device type we're looking for?
+		cmp.w		2(sp),d1
+		bne.s		csd1
+
+* Get current index and increment.
+		swap		d2
+		move.w	d2,d1
+		addq		#1,d2
+		swap		d2
+
+* Is this the device index we're looking for?
+		cmp.w		0(sp),d1
+		bne.s		csd1
+
+* Save device name.
+		move.l	a2,a0
+csd4
+* Skip char of device name.
+		move.b	(a2)+,d2
+		cmp.b		#':',d2
+		beq.s		csd5
+		cmp.b		#13,d2
+		bne.s		csd4
+		move.b	d2,(a2)
+csd5
+* Save device parameters.
+		move.l	a2,a1
+		clr.b		-(a2)
+csd6
+		move.b	(a2)+,d2
+		cmp.b		#13,d2
+		bne.s		csd6
+		clr.b		-(a2)
+
+* Close CSD file.
+		os9		I$Close
+		bra.s		csd9
+
+csd7
+* Close CSD file.
+		os9		I$Close
+
+csd8
+* Device not found.
+		lea		csdline(a6),a0
+		move.l	a0,a1
+		clr.b		(a0)
+
+csd9
+		move.l	(sp)+,d0
+		rts
+
+** Finds device parameter.
+*
+* @param a0 Device parameter name.
+* @param a1 Device parameters string
+* @return a0 Device parameter value.
+* @return cc Carry set if not found, Zero set if no value
+* @return d1 Error code if not found.
+
+csdparam:
+		movem.l	a0-a1,-(sp)
+
+par1
+* Compare name character.
+		move.b	(a0)+,d0
+		beq.s		par2
+		cmp.b		(a1)+,d0
+		beq.s		par1
+
+par2
+* Check end of parameter name.
+		move.b	(a1),d1
+		beq.s		par4
+		cmp.b		#13,d1
+		beq.s		par4
+		cmpi.b	#':',d1
+		beq.s		par4
+		cmpi.b	#'=',(a1)+
+		bne.s		par2
+
+* Parameter with value found.
+		move.l	a1,a0
+		tst.b		d1
+		bra.s		par6
+
+par3
+* Skip parameter
+		move.b	(a1)+,d1
+		beq.s		par5
+		cmp.b		#':',d1
+		bne.s		par3
+
+* Try next parameter.
+		move.l	(sp),a0
+		bra.s		par1
+
+par4
+* Parameter found without value.
+		clr.l		d0
+		move.l	d0,a0
+		bra.s		par6
+
+par5
+* Parameter not found.
+		moveq		#E$PNNF,d1
+		ori.w		#1,ccr
+
+par6
+		addq		#4,sp
+		move.l	(sp)+,a1
+		rts
+
+csdnumber:
+		bsr.s		csdparam
+		bcs.s		num3
+		beq.s		num3
+
+		moveq		#0,d0
+		moveq		#0,d1
+
+num1
+		move.b	(a0)+,d1
+		cmp.b		#'"',d1
+		beq.s		num1
+		sub.b		#'0',d1
+		blo.s		num2
+		cmp.b		#10,d1
+		bhs.s		num2
+		mulu		#10,d0
+		add.w		d1,d0
+		bra.s		num1
+
+num2
+		tst.w		d0
+
+num3
+		rts
+
+
+** Name of CSD file.
+csdname:
+		dc.b		"/nvr/csd",0
+		
+		align
+	
+		vsect
+		
+** CSD line buffer.
+csdline:		ds.b		CSDLINE+1
+				
+		ends	
+			
+		ends
+

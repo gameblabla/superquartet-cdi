@@ -1,0 +1,140 @@
+* CD-I Frog Feast (c) RasterSoft
+
+	use	<oskdefs.d>
+
+	use	"Defines\csdtype.d"
+	use	"Defines\Defines.d"
+	use	"Defines\dcpins.d"
+	use	"Defines\viddcp.d"
+
+	psect	Routines,0,0,0,0,0
+
+* Read a file from the CD.
+* D2 - Size
+* A0 - Pointer to file name
+* A1 - Pointer to memory
+ReadFile:
+	move.w	#Read_,d0
+	os9		I$Open
+	bcs		ReadFileExit
+
+	move.l	d2,d1
+	move.l	a1,a0
+	os9		I$Read
+	bcs		ReadFileExit
+
+	os9		I$Close
+
+ReadFileExit:
+	rts
+
+* Seed the random number generator, based on the current date and time.
+SeedRandomNumber:
+	movem.l d2-d3,-(sp)
+
+* Get current date/time (without ticks) in d0 and d1
+	move.w	#0,d0
+	os9		F$Time
+
+* Store the random seed
+	add.l	d0,d1
+	move.l	d0,RandomSeed1(a6)
+	move.l	d1,RandomSeed2(a6)
+
+* Get a longword random number
+	bsr.s 	LongRnd
+
+	movem.l (sp)+,d2-d3
+
+	rts
+
+* D0 - Limit
+LongRnd:
+	movem.l d2-d3,-(sp)
+
+* d0=LSB's, d1=MSB's of random number
+	move.l	RandomSeed1(a6),d0
+	move.l	RandomSeed2(a6),d1
+
+* Ensure upper 59 bits are an...
+	andi.b	#0x0E,d0
+
+* ...odd binary number
+	ori.b	#0x20,d0
+	move.l	d0,d2
+	move.l	d1,d3
+
+* Accounts for 1 of 17 left shifts
+	add.l	d2,d2
+
+* [d2/d3] = RND*2
+	addx.l	d3,d3
+	add.l	d2,d0
+
+* [d0/d1] = RND*3
+	addx.l	d3,d1
+
+* Shift [d2/d3] additional 16 times
+	swap	d3
+	swap	d2
+	move.w	d2,d3
+	clr.w	d2
+
+* Add to [d0/d1]
+	add.l	d2,d0
+	addx.l	d3,d1
+
+* Save for next time through
+	move.l	d0,RandomSeed1(a6)
+	move.l	d1,RandomSeed2(a6)
+
+* Most random part to d0
+	move.l	d1,d0
+
+	movem.l (sp)+,d2-d3
+
+	rts
+
+* void Random(DWORD Limit);
+* D0 - Limit
+Random:
+	move.l	d2,-(sp)
+
+* Save upper limit
+	move.w	d0,d2
+
+* Range of 0 returns 0 always
+	beq.s	Zero
+
+* Get a longword random number
+	bsr.s 	LongRnd
+
+* Use upper word (it's most random)
+	clr.w	d0
+	swap	d0
+
+* Divide by range...
+	divu.w	d2,d0
+
+* ...and use remainder for the value
+	clr.w	d0
+
+* Result in d0.w
+	swap	d0
+
+Zero:
+	move.l	(sp)+,d2
+
+	rts
+
+	vsect
+
+RandomSeed1:
+	dc.l	0x6973C72A
+
+RandomSeed2:
+	dc.l	0x21F79712
+	
+	ends
+
+	ends

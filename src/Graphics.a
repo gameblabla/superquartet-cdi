@@ -1,0 +1,1097 @@
+* CD-I Frog Feast (c) RasterSoft
+
+	use	<oskdefs.d>
+
+	use	"Defines\Defines.d"
+	use	"Defines\dcpins.d"
+	use	"Defines\viddcp.d"
+
+	psect	Graphics,0,0,0,0,0
+
+* Clear a graphics plane.
+* Not optmized for speed, since it's not called from rendering code.
+* D0 - Size
+* A0 - Plane Pointer
+ClearPlane:
+* Clear 32 pixels
+	move.l	#0,(a0)
+	move.l	#0,4(a0)
+	move.l	#0,8(a0)
+	move.l	#0,12(a0)
+	move.l	#0,16(a0)
+	move.l	#0,20(a0)
+	move.l	#0,24(a0)
+	move.l	#0,28(a0)
+
+* Advance to next set of pixels
+	add.l	#32,a0
+
+	dbra	d0,ClearPlane
+
+	rts
+
+* Transfer image to graphics plane.
+* Not optimized for speed, since it's not called from rendering code.
+* A0 - Image buffer
+* A1 - Plane buffer
+TransferImage:
+	move.l	#(IMAGEHEIGHT*SCREENWIDTH/32)-1,d0
+
+TransferImageLoop:
+* Transfer 32 pixels
+	move.l	(a0),(a1)
+	move.l	4(a0),4(a1)
+	move.l	8(a0),8(a1)
+	move.l	12(a0),12(a1)
+	move.l	16(a0),16(a1)
+	move.l	20(a0),20(a1)
+	move.l	24(a0),24(a1)
+	move.l	28(a0),28(a1)
+
+	add.l	#32,a0
+	add.l	#32,a1
+
+	dbra	d0,TransferImageLoop
+
+	rts
+
+* Load plane A palette. Palette must be formatted into FCT/LCT control DWORDs.
+* A0 - Palette address
+LoadPaletteA:
+* Transfer Plane A palette
+	move.w	#FCT_CLUT,d4
+	move.w	#PALETTE_SIZE/4,d5
+	bsr		WriteFCTBlockA
+
+	rts
+
+* Load plane B palette. Palette must be formatted into FCT/LCT control DWORDs.
+* A0 - Palette address
+LoadPaletteB:
+* Transfer Plane B palette
+	move.w	#FCT_CLUT,d4
+	move.w	#PALETTE_SIZE/4,d5
+	bsr		WriteFCTBlockB
+
+	rts
+
+* Update plane A pointer to flip a double buffered screen
+* D0 - Frame to flip to (0 or 1)
+* Flip Plane A - Update frame pointer
+FlipPlaneA:
+	move.l	PlaneBufferA(a6),d5
+
+	or.w	#0,d0
+	beq.s	FlipPlaneAFrame0
+
+	add.l	#(SCREENWIDTH*SCREENHEIGHT),d5
+
+FlipPlaneAFrame0:
+* Change Plane A video start address
+	move.w	#FCT_VSR,d4
+
+	and.l	#VSR_MASK,d5
+	ori.l	#CP_VSR,d5
+	bsr		WriteFCTA
+
+	rts
+
+* Update plane B pointer to flip a double buffered screen
+* D0 - Frame to flip to (0 or 1)
+* Flip Plane B - Update frame pointer
+FlipPlaneB:
+	move.l	PlaneBufferB(a6),d5
+
+	or.w	#0,d0
+	beq.s	FlipPlaneBFrame0
+
+	add.l	#(SCREENWIDTH*SCREENHEIGHT),d5
+
+FlipPlaneBFrame0:
+* Change Plane B video start address
+	move.w	#FCT_VSR,d4
+
+	and.l	#VSR_MASK,d5
+	ori.l	#CP_VSR,d5
+	bsr		WriteFCTB
+
+	rts
+
+* Render TextBlocks
+* D3 - Frame number
+RenderTextBlocks:
+* Load address of the TextBlock array
+	lea		TextBlock(a6),a0
+
+* Load the maximum number of TextBlocks
+	move.w	#MAXTEXT-1,d0
+
+RenderTextBlocksLoop:
+* Draw text stops on an unused TextBlock, since text is added and not removed.
+	cmpi.l	#0,8(a0)
+	beq.s	ExitRenderTextBlocks
+
+RenderTextBlocksUpdateFrameA:
+* Load PlaneOffset
+	move.l	(a0),a1
+
+* Add in FrameAddress
+	add.l	FrameAddress(a6),a1
+
+* Load data offset
+	move.l	4(a0),a2
+
+* Add in address of PlaneAData
+	add.l	PlaneAData(a6),a2
+
+* Draw the text character
+	bsr		DrawText
+
+* Advance to the next text block
+	add.l	#TEXTBLOCKSIZE,a0
+
+	dbra	d0,RenderTextBlocksLoop
+
+ExitRenderTextBlocks:
+	rts
+
+* Draw a single TextBlock
+* A1 - Plane Memory to draw to
+* A2 - Memory for character
+DrawText:
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	(a2)+,(a1)+
+	move.l	(a2)+,(a1)
+
+	rts
+
+* Erase SpriteBlocks
+* D3 - Frame number
+EraseSpriteBlocks:
+* Load address of the SpriteBlock array
+	lea		SpriteBlock(a6),a0
+
+* Load the maximum number of SpriteBlocks
+	move.w	#18-1,d0
+
+EraseSpriteBlocksLoop:
+* Check if sprite is used
+* Load EraseOffset for Frame A
+	move.l	a0,a3
+
+* Check Frame
+	or.w	#0,d3
+	beq.s	EraseSpriteBlocksFrameA
+
+* Load EraseOffset for Frame B.
+	addq.l	#4,a3
+
+EraseSpriteBlocksFrameA:
+	move.l	(a3),a1
+
+* Check if EraseOffset is invalid
+	cmp.l	#$80000000,a1
+	beq.s	EraseNextSprite
+
+* Check if sprite is used
+	cmpi.l	#0,20(a0)
+	bne.s	SkipRemoveEraseOffset
+
+* Mark EraseOffset as invalid
+	move.l	#$80000000,(a3)
+
+SkipRemoveEraseOffset:
+* Add in FrameAddress
+	add.l	FrameAddress(a6),a1
+
+* Load sprite width
+	move.l	16(a0),d1
+
+	bsr		EraseSprite
+
+EraseNextSprite:
+* Advance to the next text block
+	add.l	#SPRITEBLOCKSIZE,a0
+
+	dbra	d0,EraseSpriteBlocksLoop
+
+	rts
+
+* Erase a single SpriteBlock
+* A1 - Memory to erase from
+* D1 - Sprite Width
+EraseSprite:
+	movem.l	d1-d2,-(sp)
+
+* Transfer address to d3 to check for odd address
+	move.l	a1,d2
+
+* Check to see if destination address is word aligned
+	btst.l	#0,d2
+	beq		EraseSpriteEven
+
+* Odd sprite erase
+* Loop adjust sprite width and divide by 2 for word transfers (Subract 2, since one word is done outside the loop)
+	lsr.w	#1,d1
+	subq.w	#2,d1
+
+* Clear odd byte at the beginning
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+	
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1	
+
+* Clear last pixel, but don't increment address, since it can be done with the following instruction
+	move.b	#0,(a1)
+
+* Advance to next pixel
+	sub.l	#SCREENWIDTH*15-1,a1
+
+EraseOddSpriteLoop:
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+	
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+* Clear last two pixels, but don't increment address, since it can be done with the following instruction
+	move.w	#0,(a1)
+
+* Advance to next pixel group
+	sub.l	#SCREENWIDTH*15-2,a1
+
+	dbra	d1,EraseOddSpriteLoop
+
+* Clear odd byte at the end
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.b	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+* Clear last pixel, but don't increment address, since it can be done with the following instruction
+	move.b	#0,(a1)
+
+	bra		ExitEraseSprite
+
+* Erase a word aligned sprite
+EraseSpriteEven:
+	btst.l	#1,d2
+	beq		EraseSpriteAligned
+
+* Loop adjust sprite width and divide by 2 for word transfers.
+	lsr.w	#1,d1
+	subq.w	#1,d1
+
+EraseSpriteLoop:
+* Transfer 16 pixel high strips, since sprites are always 16 pixels tall.
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+	move.w	#0,(a1)
+	add.l	#SCREENWIDTH,a1
+
+* Clear last two pixels, but don't increment address, since it can be done with the following instruction
+	move.w	#0,(a1)
+
+* Advance to next pixel
+	sub.l	#SCREENWIDTH*15-2,a1
+
+	dbra	d1,EraseSpriteLoop
+
+	bra		ExitEraseSprite
+
+EraseSpriteAligned:
+* Loop adjust sprite width and divide by 8 for 2 dword transfers. Sprites are always a multiple of 8 wide.
+	lsr.w	#3,d1
+	subq.w	#1,d1
+
+EraseSpriteAlignedLoop:
+* Transfer 16 pixel high strips, since sprites are always 16 pixels tall.
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+	add.l	#SCREENWIDTH-4,a1
+
+* Clear eight pixels, but don't increment address, since it can be done with the following instruction
+	move.l	#0,(a1)+
+	move.l	#0,(a1)
+
+* Advance to next pixel
+	sub.l	#SCREENWIDTH*15+4-8,a1
+
+	dbra	d1,EraseSpriteAlignedLoop
+
+ExitEraseSprite:
+	movem.l	(sp)+,d1-d2
+
+	rts
+
+* Render SpriteBlocks
+* D3 - Frame number
+RenderSpriteBlocks:
+* Load address of the SpriteBlock array
+	lea		SpriteBlock(a6),a0
+
+* Load the maximum number of TextBlocks
+	move.w	#18-1,d0
+
+RenderSpriteBlocksLoop:
+* Check if sprite is used
+	cmpi.l	#0,20(a0)
+	beq.s	RenderNextSprite
+
+* Load sprite width
+	move.l	16(a0),d1
+
+* Load plane offset
+	move.l	8(a0),a1
+
+* Load EraseOffset for Frame A
+	move.l	a0,a3
+
+* Check Frame
+	or.w	#0,d3
+	beq.s	RenderSpriteBlocksUpdateFrameB
+
+* Load EraseOffset for Frame B.
+	addq.l	#4,a3
+
+RenderSpriteBlocksUpdateFrameB:
+	move.l	a1,(a3)
+
+RenderSpriteBlocksDraw:
+* Add in address of Plane A, based on Frame
+	add.l	FrameAddress(a6),a1
+
+* Load data offset
+	move.l	12(a0),a2
+	add.l	PlaneAData(a6),a2
+
+* Draw a sprite
+	bsr		DrawSprite
+
+RenderNextSprite:
+* Advance to the next text block
+	add.l	#SPRITEBLOCKSIZE,a0
+
+	dbra	d0,RenderSpriteBlocksLoop
+
+	rts
+
+* Draw a single SpriteBlock
+* A1 - Plane Memory to draw to
+* A2 - Memory for character
+* D1 - Sprite width
+DrawSprite:
+	movem.l	d0-d4,-(sp)
+
+* Calculate offset to next line
+	move.l	#SCREENWIDTH,d4
+	sub.l	d1,d4
+
+* Set sprite height
+	move.w	#16-1,d2
+
+* Transfer address to d3 to check for odd address
+	move.l	a1,d3
+
+* Check if destination address is even
+	btst.l	#0,d3
+	beq		DrawSpriteEven
+
+* Loop adjust sprite width
+	subq.w	#1,d1
+
+DrawSpriteOuterLoop:
+	move.w	d1,d3
+
+DrawSpriteInnerLoop:
+	move.b	(a2)+,d0
+	beq.s	DrawSpriteSkip
+
+* Write a pixel
+	move.b	d0,(a1)
+
+DrawSpriteSkip:
+	addq.l	#1,a1
+
+	dbra	d3,DrawSpriteInnerLoop
+
+* Advance to start of next line
+	add.l	d4,a1
+
+	dbra	d2,DrawSpriteOuterLoop
+	
+	bra.s	ExitDrawSprite
+
+DrawSpriteEven:
+* Loop adjust sprite width, and divide by four to transfer dwords
+	lsr.w	#2,d1
+	subq.w	#1,d1
+
+DrawSpriteEvenOuterLoop:
+	move.w	d1,d3
+
+DrawSpriteEvenInnerLoop:
+* See if plane is already blank
+	tst.l	(a1)
+	bne.s	DrawSpriteEvenNormal
+
+* Transfer 4 pixels, with no transparency check
+	move.l	(a2)+,(a1)+
+
+	bra.s	NextDwordLoop
+
+* Check to see which pixels need to be written
+DrawSpriteEvenNormal:
+* Check if both pixel are transparent
+	move.w	(a2)+,d0
+	beq.s	NextPixel
+	
+* Check if upper pixel is transparent
+	cmp.w	#255,d0
+	bls.s	WriteLowerByte
+
+* Check if lower pixel is transparent
+	cmp.b	#0,d0
+	beq.s	UpperBytePixel
+
+* Write both pixels
+	move.w	d0,(a1)+
+
+NextLoop:
+* Get next two pixels. Needed because destination transparancy affects 4 pixels.
+	move.w	(a2)+,d0
+	beq.s	NextPixel2
+	
+* Check if upper pixel is transparent
+	cmp.w	#255,d0
+	bls.s	WriteLowerByte2
+
+* Check if lower pixel is transparent
+	cmp.b	#0,d0
+	beq.s	UpperBytePixel2
+
+* Write both pixels
+	move.w	d0,(a1)+
+
+NextDwordLoop:
+	dbra	d3,DrawSpriteEvenInnerLoop
+
+* Advance to start of next line
+	add.l	d4,a1
+
+	dbra	d2,DrawSpriteEvenOuterLoop
+
+ExitDrawSprite:
+	movem.l	(sp)+,d0-d4
+
+	rts
+
+* Write upper pixel
+UpperBytePixel:
+	swap.w	d0
+
+	move.b	d0,(a1)
+
+NextPixel:
+	addq.l	#2,a1
+
+	bra.s	NextLoop
+
+* Write lower pixel
+WriteLowerByte:
+	move.b	d0,1(a1)
+	
+	addq.l	#2,a1
+
+	bra.s	NextLoop
+
+* Write upper pixel of second word
+UpperBytePixel2:
+	swap.w	d0
+
+	move.b	d0,(a1)
+
+NextPixel2:
+	addq.l	#2,a1
+
+	bra.s	NextDwordLoop
+
+* Write lower pixel of second word
+WriteLowerByte2:
+	move.b	d0,1(a1)
+	
+	addq.l	#2,a1
+
+	bra.s	NextDwordLoop
+
+* Wait for video interrupt, and update text and sprites
+WaitVBlank:
+	movem.l	d2-d5/a0-a3,-(sp)
+
+* Update text and sprites
+	bsr.s	UpdateGraphics
+
+* Update input
+	bsr		UpdateInput
+
+	movem.l	(sp)+,d2-d5/a0-a3
+
+	rts
+
+* Update graphics
+UpdateGraphics:
+* Swap planes
+	move.w	Frame(a6),d0
+	bsr		FlipPlaneA
+
+* Wait for vertical blank
+	bsr		WaitVBlankInternal
+
+* Toggle frame between 0 and 1. D3 is set for all of the Erase, Render and, Remove functions
+	move.w	Frame(a6),d3
+	addq.w	#1,d3
+	and.w	#1,d3
+	move.w	d3,Frame(a6)
+
+* Load address of Plane A - Frame 0
+	move.l	PlaneBufferA(a6),a0
+
+* Select Frame 1, based on Frame
+	or.w	#0,d3
+	beq.s	UpdateFrameA
+
+* Add in offset for Plane A - Frame 1
+	add.l	#(SCREENWIDTH*SCREENHEIGHT),a0
+
+UpdateFrameA:
+* Add in screen offset for NTSC/PAL screens
+	add.l	ScreenOffset(a6),a0
+	move.l	a0,FrameAddress(a6)
+
+* Erase SpriteBlocks
+	bsr		EraseSpriteBlocks
+
+* Render SpriteBlocks
+	bsr		RenderSpriteBlocks
+
+* Render TextBlocks
+	bsr		RenderTextBlocks
+
+	rts
+
+* Add TextBlock to TextBlock list
+* D0 - PlaneOffset
+* D1 - DataOffset
+AddText:
+	movem.l	d2-d3/a0,-(sp)
+
+* Load address of TextBlock
+	lea		TextBlock(a6),a0
+
+* Load the maximum number of TextBlocks
+	move.w	#MAXTEXT-1,d2
+
+AddTextLoop:
+* Check if TextBlock is unused
+	cmpi.l	#0,8(a0)
+	bne.s	AddTextCheckPlaneOffset
+
+* Store PlaneOffset and DataOffset in TextBlock
+	move.l	d0,(a0)+
+	move.l	d1,(a0)+
+
+* Mark TextBlock as used
+	move.l	#1,(a0)
+		
+	bra.s	AddTextExit
+
+AddTextCheckPlaneOffset:
+* Check if PlaneOffsets are the same
+	move.l	(a0),d3
+	cmp.l	d0,d3
+	bne.s	AddTextNextLoop	
+	
+* Store DataOffset
+	move.l	d1,4(a0)
+
+	bra.s	AddTextExit
+
+AddTextNextLoop:
+	add.l	#TEXTBLOCKSIZE,a0
+
+	dbra	d2,AddTextLoop
+
+AddTextExit:
+	movem.l	(sp)+,d2-d3/a0
+
+	rts
+
+* Clear TextBlocks
+ClearTextBlocks:
+	movem.l	a0,-(sp)
+
+* Load address of TextBlock
+	lea		TextBlock(a6),a0
+
+* Load the maximum number of TextBlocks
+	move.w	#MAXTEXT-1,d0
+
+ClearTextBlocksLoop:
+* Clear Plane and Data offsets
+	move.l	#0,(a0)+
+	move.l	#0,(a0)+
+	
+* Mark TextBlock as unused
+	move.l	#0,(a0)+
+
+	dbra	d0,ClearTextBlocksLoop
+
+	movem.l	(sp)+,a0
+
+	rts
+
+* Setup sprite in sprite list
+* D0 - Sprite index
+* D1 - Sprite x
+* ARGS (Sprite y, Width, DataOffset)
+SetupSprite:
+	movem.l	d2-d3/a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+
+* Multiply sprite index by 24
+	move.l	d0,d2
+	lsl.l	#4,d0
+	lsl.l	#3,d2
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d2,a0
+
+* Calculate PlaneOffset
+	move.l	ARGS+12(sp),d2
+	move.l	d2,d3
+		
+* Calculate y * 384
+	lsl.l	#8,d2
+	lsl.l	#7,d3
+	add.l	d2,d3
+
+* Add in x
+	add.l	d1,d3
+
+* Store the PlaneOffset
+	move.l	d3,8(a0)
+
+* Store the Width
+	move.l	ARGS+12+4(sp),d0
+	move.l	d0,16(a0)
+	
+* Store DataOffset
+	move.l	ARGS+12+8(sp),d1
+	move.l	d1,12(a0)
+
+* Mark sprite as used
+	move.l	#1,20(a0)
+
+	movem.l	(sp)+,d2-d3/a0
+
+	rts
+
+* Remove sprite from sprite list
+* D0 - Sprite index
+RemoveSprite:
+	move.l	a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+
+* Ensure upper word of sprite index is cleared
+	move.l	d0,d1
+
+* Multiply sprite index by 24
+	lsl.l	#4,d0
+	lsl.l	#3,d1
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d1,a0
+
+* Set sprite as unused
+	move.l	#0,20(a0)
+	
+	move.l	(sp)+,a0
+
+	rts
+
+* Set sprite position
+* D0 - Sprite index
+* D1 - Sprite x
+* ARGS (Sprite y)
+SetSpritePosition:
+	movem.l	d2-d3/a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+
+* Multiply sprite index by 24
+	move.l	d0,d2
+	lsl.l	#4,d0
+	lsl.l	#3,d2
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d2,a0
+
+* Calculate PlaneOffset
+	move.l	ARGS+12(sp),d2
+	move.l	d2,d3
+		
+* Calculate y * 384
+	lsl.l	#8,d2
+	lsl.l	#7,d3
+	add.l	d2,d3
+
+* Add in x
+	add.l	d1,d3
+
+* Store the PlaneOffset
+	move.l	d3,8(a0)
+
+	movem.l	(sp)+,d2-d3/a0
+
+	rts
+
+* Set sprite tile
+* D0 - Sprite index
+* D1 - DataOffset
+SetSpriteTile:
+	movem.l	d2/a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+	
+* Ensure upper word of sprite index is cleared
+	move.l	d0,d2
+
+* Multiply sprite index by 24
+	lsl.l	#4,d0
+	lsl.l	#3,d2
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d2,a0
+
+* Store DataOffset
+	move.l	d1,12(a0)
+
+	movem.l	(sp)+,d2/a0
+
+	rts
+
+* Clear sprite list
+ClearSpriteList:
+	lea		SpriteBlock(a6),a0
+	
+* Clear MAXSPRITE sprites
+	move.w	#18-1,d0
+
+ClearSpriteListLoop:
+* Set EraseOffset to invalid
+	move.l	#$80000000,(a0)
+	move.l	#$80000000,4(a0)
+
+* Mark sprite as unused
+	move.l	#0,20(a0)
+
+	add.l	#SPRITEBLOCKSIZE,a0
+
+	dbra	d0,ClearSpriteListLoop
+
+	rts
+
+* Set palette blue and green colors. Red is not changed. Used to change sky color.
+* D0.w - Palette Index
+* D1.w - New color
+SetPaletteBlueGreen:
+	movem.l	d2-d5,-(sp)
+
+* Save a copy of the color
+	clr.l	d5
+	move.w	d1,d5
+
+* Get FCT Clut offset, add 1 to skip bank 
+	move.w	#FCT_CLUT+1,d4
+
+* Check to see if color is in bank 2
+	cmp.w	#64,d0
+	blt.s	SkipBank2
+
+* Skip second palette bank setting
+	addq.w	#1,d4
+
+SkipBank2:
+* Add in palette index
+	add.w	d0,d4
+
+* Read current color, from Plane B
+	bsr		ReadFCTB
+
+* Mask out green and blue
+	and.l	#$FFFF0000,d0
+	or.l	d0,d5
+
+* Write modified color, to Plane B
+	bsr		WriteFCTB
+
+	movem.l	(sp)+,d2-d5
+
+	rts
+
+	ends

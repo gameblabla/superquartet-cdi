@@ -1,0 +1,153 @@
+* CD-I Frog Feast (c) RasterSoft
+
+	use	<oskdefs.d>
+
+	use	"Defines\Defines.d"
+
+	psect	Graphics,0,0,0,0,0
+
+SetupSprite:
+	movem.l	d2/a0,-(sp)
+
+* Ensure upper work of sprite index is cleared
+	and.l	#$0000FFFF,d0
+	move.l	d0,d2
+
+* Multiply sprite index by 24
+	lsl.l	#4,d0
+	lsl.l	#3,d2
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d2,a0
+
+	movem.l	(sp)+,d2/a0
+
+	rts
+
+RemoveSprite:
+	movem.l	a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+
+* Ensure upper work of sprite index is cleared
+	and.l	#$0000FFFF,d0
+	move.l	d0,d1
+
+* Multiply sprite index by 24
+	lsl.l	#4,d0
+	lsl.l	#3,d1
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d1,a0
+
+* Set sprite as unused
+	move.l	#0,20(a0)
+	
+	movem.l	(sp)+,a0
+
+	lea		SpriteBlock(a6),a0
+
+	movem.l	(sp)+,d2/a0
+
+	rts
+
+SetSpritePosition:
+	movem.l	d2-d3/a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+
+* Ensure upper work of sprite index is cleared
+	and.l	#$0000FFFF,d0
+	move.l	d0,d2
+
+* Multiply sprite index by 24
+	lsl.l	#4,d0
+	lsl.l	#3,d2
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d2,a0
+
+* Calculate PlaneOffset
+	move.w	ARGS(sp),d2
+	and.l	#$0000FFFF,d2
+	move.l	d2,d3
+		
+* Calculate y * 384
+	lsl.l	#8,d2
+	lsl.l	#7,d3
+	add.l	d2,d3
+
+* Add in x
+	and.l	#$0000FFFF,d1
+	add.l	d1,d3
+
+* Store the PlaneOffset
+	move.l	d3,8(a0)
+
+* Store the Width
+	move.l	ARGS+4(sp),d0
+	move.l	d0,16(a0)
+	
+* Store DataOffset
+	move.l	ARGS+8(sp),d1
+	move.l	d1,12(a0)
+
+* Mark sprite as used
+	move.l	#1,0(a0)
+
+	movem.l	(sp)+,d2-d3/a0
+
+	rts
+
+* D0 - Sprite index
+* D1 - DataOffset
+SetSpriteTile:
+	movem.l	d2/a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+	
+* Ensure upper work of sprite index is cleared
+	and.l	#$0000FFFF,d0
+	move.l	d0,d2
+
+* Multiply sprite index by 24
+	lsl.l	#4,d0
+	lsl.l	#3,d2
+
+* Add in sprite index	
+	add.l	d0,a0
+	add.l	d2,a0
+
+* Store DataOffset
+	move.l	d1,12(a0)
+
+	movem.l	(sp)+,d2/a0
+
+	rts
+
+ClearSpriteList:
+	movem.l	a0,-(sp)
+
+	lea		SpriteBlock(a6),a0
+
+	move.w	#MAXSPRITES-1,d0
+
+ClearSpriteList:
+* Set EraseOffset to invalid
+	move.l	#$80000000,0(a0)
+	move.l	#$80000000,4(a0)
+
+* Mark as unused
+	move.l	#0,20(a0)
+
+	add.l	#SPRITEBLOCKSIZE,a0
+
+	dbra	d0,ClearSpriteList
+
+	movem.l	(sp)+,a0
+
+	rts
+

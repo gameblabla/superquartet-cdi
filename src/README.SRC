@@ -1,0 +1,81 @@
+README.SRC
+----------
+
+Most of the graphics setup code for this program is
+identical to or based on code written by CD-i Fan.
+
+The following files contain definitions of CD-i constants:
+
+CD-I\Defines\csdtype.d - Defines CSD device type numbers.
+CD-I\Defines\dcpins.d - Defines video DCP instruction constants.
+CD-I\Defines\viddcp.d - Defines video DCP layout constants.
+
+The following file contains code to access the Configuration
+Status Descriptor (CSD) of the CD-i player:
+
+CD-I\csdfind.a - Finds device name and parameters in CSD.
+
+The following files contain code to setup the graphics
+subsystem of the CD-i player for two-plane 8-bit mode:
+
+CD-I\Video.a - Initializes video system.
+CD-i\Cursor.a - Initialize cursor.
+
+The csdtype.d and csdfind.a files are identical and updated
+versions of the ones distributed with CD-i Stub version 0.5.1.
+
+The dcpins.d and viddcp.d files are original source code
+written by CD-i Fan but have not been distributed before.
+
+The Video.a and Cursor.a files are based on unreleased code
+written by CD-i Fan; the modifications made by Charles Doty
+include the following:
+
+- Integrating two source files provided by CD-i Fan
+into a working whole, including some (joint) debugging.
+
+- Renaming the routines to make the code more readable
+for someone without detailed CD-i knowledge. The initial
+naming used by CD-i Fan was based on the function names
+of the C bindings and those used in the Green Book.
+
+- Adding some comments and, in one case, a small bug :-)
+
+All files written by CD-i Fan are released under the LGPL
+and clearly marked so in the sources. However, as a special
+exception it is allowed to distribute these files in compiled
+or source form with programs using or substantially deriving
+from the Video.a and Cursor.a files written by Charles Doty,
+under the same license as the latter files.
+
+The two files Video.a and Cursor.a are heavily based on files
+written by CD-i Fan but are not licensed under the LGPL.
+
+And now a shameless plug...
+
+If the CD-i homebrew scene is to seriously take off,
+there is obviously a demand for a basic CD-i toolkit.
+The platform is too complex and requires too much study
+to easily program fully from scratch. Some of the demand
+can be filled by this source code release, but there are
+major gaps.
+
+The CD-i Base library will supply such a basic toolkit.
+It will ultimately contain functions to access all the
+commonly-used functions of the CD-i platform and will
+do so in a way fully conformant with the Green Book.
+
+The CD-i Base library will be brought to you by CD-i Fan,
+the author of the wellknown CD-i Emulator, drawing on
+his extensive experience for programming the CD-i system.
+
+The CD-i Base library will be released under the LGPL
+and sources will be available from the very beginning.
+Contact the CD-i Base author for other licensing options.
+
+More information can be found at the CD-i Base website
+that will soon appear at http://www.cdiemu.org/cdibase.
+
+	CD-i Fan
+	Charles Doty
+

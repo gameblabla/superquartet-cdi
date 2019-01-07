@@ -1,0 +1,31 @@
+Master C:\CDIGAME\FROG.MSC 
+FULL CD IMAGE
+Start generation of album "FROG FEAST"
+Start generation of volume "FROG FEAST" [about 00:34:00 sectors]
+Start generation of MESSAGE area
+Start generation of COPYRIGHT file COPYRGHT.TXT
+Start generation of ABSTRACT file ABSTRACT.TXT
+Start generation of BIBLIOGRAPHIC file BIBLIOGR.TXT
+Start generation of APPLICATION file CDI_FROG
+Start generation of YELLOW file PLANEA.BIN
+Start generation of YELLOW file PLANEB.BIN
+Start generation of YELLOW file PALETTES.BIN
+Start generation of YELLOW file SOUNDS.BIN
+Start generation of DIRECTORY /
+Start generation of Motorola PATH table file
+Start generation of volume "FROG FEAST"'s label
+End   generation of volume "FROG FEAST" [00:34 - space efficiency 99%]
+		Directory of /
+ Owner    Last modified Attributes Sector Bytecount Name
+-------   ------------- ---------- ------ --------- ----
+  0.0     107/07/21 1803 ---r--r--r    8de       362 COPYRGHT.TXT
+  0.0     107/07/21 1805 ---r--r--r    8df        92 ABSTRACT.TXT
+  0.0     107/07/21 1805 ---r--r--r    8e0       149 BIBLIOGR.TXT
+  0.0     118/12/11 0538 -e-re-re-r    8e1     20642 CDI_FROG
+  0.0     118/12/11 0533 ---r--r--r    8ec      6144 PLANEA.BIN
+  0.0     118/12/11 0533 ---r--r--r    8ef    184320 PLANEB.BIN
+  0.0     118/12/11 0533 ---r--r--r    949      4096 PALETTES.BIN
+  0.0     107/08/13 1124 ---r--r--r    94b     14336 SOUNDS.BIN
+  0.0     118/12/11 0538 ---r--r--r    8dc        10 PATH_TBL;
+End   generation of album "FROG FEAST"
+Done!
